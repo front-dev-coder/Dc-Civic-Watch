@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DC Civic Watch — Meeting Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet"/>
+
+  <style>
+    /* =============================================
+       CSS VARIABLES — change these to restyle everything
+       ============================================= */
+    :root {
+      --bg:        #f7f4ee;       /* warm off-white background */
+      --ink:       #1a1a16;       /* near-black text */
+      --muted:     #7a7a6e;       /* grey for secondary text */
+      --accent:    #c23b22;       /* DC red */
+      --accent2:   #1a3a5c;       /* DC navy */
+      --border:    #dedad0;       /* subtle divider */
+      --card-bg:   #ffffff;
+      --tag-open:  #e8f5e2;
+      --tag-open-text: #2d6a1f;
+      --tag-soon:  #fff4e0;
+      --tag-soon-text: #8a4f00;
+      --tag-closed:#f0f0f0;
+      --tag-closed-text: #666;
+    }
+
+    /* =============================================
+       RESET & BASE
+       ============================================= */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Lora', serif;
+      min-height: 100vh;
+    }
+
+    /* =============================================
+       HEADER
+       ============================================= */
+    header {
+      background: var(--accent2);
+      color: white;
+      padding: 0 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s ease infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(1.4); }
+    }
+
+    .header-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      opacity: 0.6;
+      letter-spacing: 0.1em;
+    }
+
+    /* =============================================
+       HERO BAND
+       ============================================= */
+    .hero {
+      background: var(--accent2);
+      color: white;
+      padding: 48px 40px 56px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Diagonal stripe decoration */
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0; right: 0;
+      height: 32px;
+      background: var(--bg);
+      clip-path: polygon(0 100%, 100% 0, 100% 100%);
+    }
+
+    .hero h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(28px, 4vw, 48px);
+      font-weight: 800;
+      line-height: 1.1;
+      max-width: 600px;
+      margin-bottom: 16px;
+    }
+
+    .hero h1 span { color: #f4a460; }
+
+    .hero p {
+      font-size: 16px;
+      opacity: 0.75;
+      max-width: 500px;
+      line-height: 1.7;
+    }
+
+    /* =============================================
+       MAIN LAYOUT
+       ============================================= */
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 48px 40px 80px;
+    }
+
+    /* =============================================
+       FILTER BAR
+       ============================================= */
+    .filter-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 36px;
+      align-items: center;
+    }
+
+    .filter-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-right: 4px;
+    }
+
+    /* Filter buttons — clicking these will filter meetings */
+    .filter-btn {
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 18px;
+      border: 1.5px solid var(--border);
+      background: white;
+      color: var(--muted);
+      cursor: pointer;
+      border-radius: 2px;
+      transition: all 0.2s ease;
+    }
+
+    .filter-btn:hover,
+    .filter-btn.active {
+      border-color: var(--accent2);
+      color: var(--accent2);
+      background: #f0f4f8;
+    }
+
+    /* =============================================
+       MEETING CARDS GRID
+       ============================================= */
+    .meetings-grid {
+      display: grid;
+      /* 
+        This creates responsive columns:
+        each column is at least 320px wide,
+        and they stretch to fill the space.
+      */
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    /* Individual meeting card */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      padding: 28px;
+      position: relative;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      /* Hidden by default for filter animation */
+      opacity: 1;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+
+    /* Left colored stripe based on agency */
+    .card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 4px;
+    }
+
+    .card[data-agency="council"]::before  { background: var(--accent2); }
+    .card[data-agency="planning"]::before { background: #2e7d4f; }
+    .card[data-agency="dpw"]::before      { background: #8b4513; }
+    .card[data-agency="health"]::before   { background: #c23b22; }
+    .card[data-agency="education"]::before{ background: #6a0dad; }
+
+    /* Card: date chip */
+    .card-date {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    /* Card: meeting title */
+    .card-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1.3;
+      margin-bottom: 10px;
+      color: var(--ink);
+    }
+
+    /* Card: agency name */
+    .card-agency {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      margin-bottom: 14px;
+    }
+
+    /* Card: description */
+    .card-desc {
+      font-size: 14px;
+      line-height: 1.65;
+      color: #4a4a40;
+      margin-bottom: 20px;
+    }
+
+    /* Card: footer row with tags and links */
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+    }
+
+    /* Status badge */
+    .badge {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 2px;
+    }
+
+    .badge-open   { background: var(--tag-open);   color: var(--tag-open-text); }
+    .badge-soon   { background: var(--tag-soon);   color: var(--tag-soon-text); }
+    .badge-closed { background: var(--tag-closed); color: var(--tag-closed-text); }
+
+    /* Action links */
+    .card-links {
+      display: flex;
+      gap: 12px;
+    }
+
+    .link-btn {
+      font-family: 'Syne', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 2px;
+      transition: all 0.2s;
+    }
+
+    .link-comment {
+      background: var(--accent);
+      color: white;
+    }
+
+    .link-comment:hover { background: #a02e17; }
+
+    .link-info {
+      border: 1.5px solid var(--border);
+      color: var(--muted);
+    }
+
+    .link-info:hover {
+      border-color: var(--accent2);
+      color: var(--accent2);
+    }
+
+    /* =============================================
+       EMPTY STATE (shown when filter has no results)
+       ============================================= */
+    .empty-state {
+      display: none;
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--muted);
+      grid-column: 1 / -1;
+    }
+
+    .empty-state p {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+    }
+
+    /* =============================================
+       SECTION LABEL
+       ============================================= */
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* =============================================
+       HOW TO ADD A MEETING — helper box
+       ============================================= */
+    .add-meeting-guide {
+      margin-top: 56px;
+      background: #f0f4f8;
+      border: 1.5px dashed #b0bec5;
+      padding: 32px;
+      border-radius: 2px;
+    }
+
+    .add-meeting-guide h3 {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--accent2);
+    }
+
+    .add-meeting-guide p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+
+    .code-block {
+      background: var(--ink);
+      color: #a8d8a8;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      padding: 20px 24px;
+      line-height: 1.8;
+      overflow-x: auto;
+      border-radius: 2px;
+    }
+
+    .code-comment { color: #6a8f6a; }
+    .code-key     { color: #7ec8e3; }
+    .code-val     { color: #f4a460; }
+
+    /* =============================================
+       FOOTER
+       ============================================= */
+    footer {
+      background: var(--ink);
+      color: rgba(255,255,255,0.4);
+      text-align: center;
+      padding: 32px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+    }
+
+    footer strong { color: rgba(255,255,255,0.7); }
+
+    /* =============================================
+       RESPONSIVE — shrink padding on small screens
+       ============================================= */
+    @media (max-width: 600px) {
+      header  { padding: 0 20px; }
+      .hero   { padding: 36px 20px 48px; }
+      main    { padding: 36px 20px 60px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============================================
+       HEADER
+       ============================================ -->
+  <header>
+    <div class="logo">
+      <div class="logo-dot"></div>
+      DC Civic Watch
+    </div>
+    <div class="header-sub">Updated weekly · Free · Open source</div>
+  </header>
+
+  <!-- ============================================
+       HERO
+       ============================================ -->
+  <div class="hero">
+    <h1>DC Government meetings,<br><span>all in one place.</span></h1>
+    <p>Public hearings, comment deadlines, and council votes — scraped from DC.gov so you don't have to find them yourself.</p>
+  </div>
+
+  <!-- ============================================
+       MAIN CONTENT
+       ============================================ -->
+  <main>
+
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <span class="filter-label">Filter by:</span>
+      <!--
+        data-filter="all" means show everything.
+        The other values match data-agency on each card.
+        JavaScript below handles the click logic.
+      -->
+      <button class="filter-btn active" data-filter="all">All Agencies</button>
+      <button class="filter-btn" data-filter="council">City Council</button>
+      <button class="filter-btn" data-filter="planning">Planning</button>
+      <button class="filter-btn" data-filter="dpw">Public Works</button>
+      <button class="filter-btn" data-filter="health">Health</button>
+      <button class="filter-btn" data-filter="education">Education</button>
+    </div>
+
+    <!-- Section label -->
+    <div class="section-label">Upcoming & Recent Meetings</div>
+
+    <!-- ==========================================
+         MEETINGS GRID
+         To add a new meeting, copy one <div class="card">
+         block and change the text inside it.
+         ========================================== -->
+    <div class="meetings-grid" id="meetingsGrid">
+
+      <!-- CARD 1 -->
+      <div class="card" data-agency="council">
+        <div class="card-date">📅 March 12, 2026 · 10:00 AM</div>
+        <div class="card-title">FY2027 Budget Oversight Hearing — Public Safety Agencies</div>
+        <div class="card-agency">DC COUNCIL · COMMITTEE ON THE JUDICIARY</div>
+        <div class="card-desc">
+          Annual oversight hearing covering MPD, FEMS, and the Office of the Attorney General. 
+          Citizens may testify in person or submit written comments by March 11.
+        </div>
+        <div class="card-footer">
+          <span class="badge badge-open">Open for Comment</span>
+          <div class="card-links">
+            <a href="https://dccouncil.gov" class="link-btn link-comment" target="_blank">Submit Comment</a>
+            <a href="https://dccouncil.gov" class="link-btn link-info" target="_blank">Details →</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 2 -->
+      <div class="card" data-agency="planning">
+        <div class="card-date">📅 March 15, 2026 · 6:30 PM</div>
+        <div class="card-title">Zoning Variance Request — 1400 Block of U Street NW</div>
+        <div class="card-agency">DC OFFICE OF ZONING · ANC 1B</div>
+        <div class="card-desc">
+          Developer is requesting a height variance to build a 9-story mixed-use building. 
+          Nearby residents have raised concerns about shadow impacts on Howard University Park.
+        </div>
+        <div class="card-footer">
+          <span class="badge badge-soon">Closes in 3 Days</span>
+          <div class="card-links">
+            <a href="https://dcoz.dc.gov" class="link-btn link-comment" target="_blank">Submit Comment</a>
+            <a href="https://dcoz.dc.gov" class="link-btn link-info" target="_blank">Details →</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 3 -->
+      <div class="card" data-agency="dpw">
+        <div class="card-date">📅 March 18, 2026 · 9:00 AM</div>
+        <div class="card-title">New Composting & Food Waste Collection Program — Public Input Session</div>
+        <div class="card-agency">DC DEPT. OF PUBLIC WORKS</div>
+        <div class="card-desc">
+          DPW is expanding its curbside composting program citywide and seeking input on 
+          rollout logistics, education outreach, and bin distribution in underserved wards.
+        </div>
+        <div class="card-footer">
+          <span class="badge badge-open">Open for Comment</span>
+          <div class="card-links">
+            <a href="https://dpw.dc.gov" class="link-btn link-comment" target="_blank">Submit Comment</a>
+            <a href="https://dpw.dc.gov" class="link-btn link-info" target="_blank">Details →</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 4 -->
+      <div class="card" data-agency="health">
+        <div class="card-date">📅 March 22, 2026 · 2:00 PM</div>
+        <div class="card-title">Mental Health Services Gap Analysis — Community Hearing</div>
+        <div class="card-agency">DC DEPT. OF BEHAVIORAL HEALTH</div>
+        <div class="card-desc">
+          DBH is gathering resident testimony on gaps in mental health access, particularly 
+          for uninsured residents in Wards 7 and 8. Testimony will inform 2027 budget requests.
+        </div>
+        <div class="card-footer">
+          <span class="badge badge-open">Open for Comment</span>
+          <div class="card-links">
+            <a href="https://dbh.dc.gov" class="link-btn link-comment" target="_blank">Submit Comment</a>
+            <a href="https://dbh.dc.gov" class="link-btn link-info" target="_blank">Details →</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 5 -->
+      <div class="card" data-agency="education">
+        <div class="card-date">📅 March 8, 2026 · 5:30 PM</div>
+        <div class="card-title">DCPS School Boundary Redistricting — Ward 3 Hearing</div>
+        <div class="card-agency">DC PUBLIC SCHOOLS · BOUNDARY STUDY COMMITTEE</div>
+        <div class="card-desc">
+          DCPS is redrawing elementary school boundaries for the first time since 2014. 
+          This session covers Ward 3 proposals. Comment period closes March 31.
+        </div>
+        <div class="card-footer">
+          <span class="badge badge-closed">Comment Closed</span>
+          <div class="card-links">
+            <a href="https://dcps.dc.gov" class="link-btn link-info" target="_blank">View Record →</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 6 -->
+      <div class="card" data-agency="council">
+        <div class="card-date">📅 March 25, 2026 · 11:00 AM</div>
+        <div class="card-title">Rent Stabilization Amendment Act — Mark-Up Session</div>
+        <div class="card-agency">DC COUNCIL · COMMITTEE ON HOUSING</div>
+        <div class="card-desc">
+          Council will mark up proposed amendments to the Rental Housing Act of 1985, 
+          including changes to allowable rent increases and exemptions for newly constructed units.
+        </div>
+        <div class="card-footer">
+          <span class="badge badge-soon">Closes in 7 Days</span>
+          <div class="card-links">
+            <a href="https://dccouncil.gov" class="link-btn link-comment" target="_blank">Submit Comment</a>
+            <a href="https://dccouncil.gov" class="link-btn link-info" target="_blank">Details →</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty state — shown when no cards match filter -->
+      <div class="empty-state" id="emptyState">
+        <p>No meetings found for this filter.</p>
+      </div>
+
+    </div><!-- end .meetings-grid -->
+
+    <!-- ==========================================
+         HOW TO ADD A MEETING
+         This is a guide for YOU, Carter, so you know
+         how to update the site each week.
+         ========================================== -->
+    <div class="add-meeting-guide">
+      <h3>📌 How to add a new meeting (for you)</h3>
+      <p>
+        Each week, check <strong>dccouncil.gov</strong>, <strong>dcoz.dc.gov</strong>, and 
+        <strong>dc.gov/calendar</strong> for new hearings. Copy the code block below and paste it 
+        inside the <code>&lt;div id="meetingsGrid"&gt;</code> section above, then fill in the details.
+      </p>
+      <div class="code-block">
+<span class="code-comment">&lt;!-- Paste this block and fill in your meeting info --&gt;</span>
+&lt;div <span class="code-key">class</span>=<span class="code-val">"card"</span> <span class="code-key">data-agency</span>=<span class="code-val">"council"</span>&gt;
+  <span class="code-comment">&lt;!-- Change data-agency to: council, planning, dpw, health, or education --&gt;</span>
+
+  &lt;div <span class="code-key">class</span>=<span class="code-val">"card-date"</span>&gt;📅 <span class="code-val">March XX, 2026 · X:00 AM</span>&lt;/div&gt;
+  &lt;div <span class="code-key">class</span>=<span class="code-val">"card-title"</span>&gt;<span class="code-val">Meeting Title Here</span>&lt;/div&gt;
+  &lt;div <span class="code-key">class</span>=<span class="code-val">"card-agency"</span>&gt;<span class="code-val">AGENCY NAME</span>&lt;/div&gt;
+  &lt;div <span class="code-key">class</span>=<span class="code-val">"card-desc"</span>&gt;<span class="code-val">Short description of what this meeting is about.</span>&lt;/div&gt;
+
+  &lt;div <span class="code-key">class</span>=<span class="code-val">"card-footer"</span>&gt;
+    <span class="code-comment">&lt;!-- Change badge class to: badge-open, badge-soon, or badge-closed --&gt;</span>
+    &lt;span <span class="code-key">class</span>=<span class="code-val">"badge badge-open"</span>&gt;Open for Comment&lt;/span&gt;
+    &lt;div <span class="code-key">class</span>=<span class="code-val">"card-links"</span>&gt;
+      &lt;a <span class="code-key">href</span>=<span class="code-val">"LINK TO COMMENT PAGE"</span> <span class="code-key">class</span>=<span class="code-val">"link-btn link-comment"</span>&gt;Submit Comment&lt;/a&gt;
+      &lt;a <span class="code-key">href</span>=<span class="code-val">"LINK TO MEETING PAGE"</span> <span class="code-key">class</span>=<span class="code-val">"link-btn link-info"</span>&gt;Details →&lt;/a&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ============================================
+       FOOTER
+       ============================================ -->
+  <footer>
+    <strong>DC Civic Watch</strong> · Not affiliated with DC Government · 
+    Data sourced from public .gov sites · Updated weekly
+  </footer>
+
+  <!-- ============================================
+       JAVASCRIPT — Filter logic
+       This is the only JS on the page. Read through
+       it — it's heavily commented so you can learn
+       how it works.
+       ============================================ -->
+  <script>
+    // Grab all the filter buttons
+    const filterButtons = document.querySelectorAll('.filter-btn');
+
+    // Grab all the meeting cards
+    const cards = document.querySelectorAll('.card[data-agency]');
+
+    // Grab the empty state message
+    const emptyState = document.getElementById('emptyState');
+
+    // Loop over each filter button and add a click listener
+    filterButtons.forEach(function(btn) {
+
+      btn.addEventListener('click', function() {
+
+        // 1. Remove 'active' class from all buttons
+        filterButtons.forEach(function(b) { b.classList.remove('active'); });
+
+        // 2. Add 'active' class to the button that was clicked
+        btn.classList.add('active');
+
+        // 3. Get the filter value from the button's data-filter attribute
+        //    e.g. "all", "council", "planning", etc.
+        const filter = btn.getAttribute('data-filter');
+
+        // 4. Track how many cards are visible
+        let visibleCount = 0;
+
+        // 5. Loop over every card
+        cards.forEach(function(card) {
+
+          // Get this card's agency (e.g. "council", "health")
+          const agency = card.getAttribute('data-agency');
+
+          // If filter is "all" OR the card's agency matches the filter,
+          // show the card. Otherwise, hide it.
+          if (filter === 'all' || agency === filter) {
+            card.style.display = 'block';
+            visibleCount++;
+          } else {
+            card.style.display = 'none';
+          }
+        });
+
+        // 6. Show the empty state message if no cards are visible
+        if (visibleCount === 0) {
+          emptyState.style.display = 'block';
+        } else {
+          emptyState.style.display = 'none';
+        }
+
+      }); // end click listener
+    }); // end forEach
+  </script>
+
+</body>
+</html>
